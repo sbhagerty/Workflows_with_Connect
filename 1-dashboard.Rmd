@@ -7,7 +7,6 @@ output:
 
 ```{r setup, include=FALSE}
 library(flexdashboard)
-library(plotly)
 library(tidyverse)
 library(openfda)
 library(ggthemes)
@@ -74,9 +73,8 @@ ggplot()+
   coord_flip()+ 
   theme_tufte()+
   xlab('')+
-  ylab('Events Reported') %>% 
-  ggplotly()
-  
+  ylab('Events Reported') 
+
 ```
 
 ### Events By Sex

@@ -1,6 +1,6 @@
 ---
 title: "Summary of Adverse Events"
-output: html_output
+output: html_document
 ---
   
     
