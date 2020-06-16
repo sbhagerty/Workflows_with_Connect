@@ -1,0 +1,98 @@
+---
+title: Stock Email Report
+output: 
+  html_document:
+    code_folding: hide
+---
+  
+# Report for TSLA on `r Sys.Date()`
+
+## Summary{.tabset}
+
+```{r, echo=TRUE, message=FALSE}
+library(blastula)
+library(DT)
+library(formattable)
+library(ggplot2)
+library(ggthemes)
+library(highcharter)
+library(quantmod)
+
+prices <- round(getSymbols("TSLA", auto.assign = FALSE, src = "yahoo"), 2)
+close <- Cl(last(prices))
+open <- Op(last(prices))
+
+recent <- last(prices, n = 90)
+recent_nv <- recent[, -5]
+```
+
+The stock closed `r ifelse(close>open,'up','down')` at `r close` dollars per share yesterday.
+
+
+### Price History
+
+The chart below is made with the `quantmod` and `highcharter` R packages. An API returns all of the price history based on the stock tick symbol "TSLA." The candlestick chart is a default function from highcharter, as is the Economist theme.
+
+
+```{r build_plot, echo=TRUE, warning=FALSE, message=FALSE}
+highchart(type = "stock") %>%
+  hc_yAxis_multiples(
+    list(title = list(text = NULL), height = "75%", top = "0%"),
+    list(title = list(text = NULL), height = "15%", top = "80.5%", opposite = TRUE)
+  ) %>%
+  hc_add_series(prices, type = "candlestick", yAxis = 0, name = "TSLA") %>%
+  hc_add_series(prices[, paste0("TSLA.Volume")], name = "Volume", type = "column", yAxis = 1) %>%
+  hc_add_theme(hc_theme_economist())
+```
+
+### Raw Data
+
+The table below displays the daily price data for the stock. A concise, interactive table is created with the `DT` package. 
+
+  
+```{r show_data, echo=TRUE}
+df <- as.data.frame(recent)
+df[, paste0("TSLA", ".Volume")] <- df[, paste0("TSLA.Volume")] / 1000000
+datatable(df) %>%
+  formatCurrency(c(paste0("TSLA.Open"), paste0("TSLA", ".High"), paste0("TSLA", ".Low"), paste0("TSLA", ".Close")), digits = 2) %>%
+  formatRound(c(paste0("TSLA", ".Volume")), digits = 0)
+```
+
+## Legacy Information
+
+This report also creates a CSV file with the relevant information updated by R. The file feeds a legacy report that will slowly be replaced.
+
+```{r write_csv, echo=TRUE}
+fname <- sprintf("%s.csv", Sys.Date())
+write.csv(df, file = fname)
+rmarkdown::output_metadata$set(rsc_output_files = list(fname))
+```
+
+[Link to CSV](`r fname`)
+
+## Email
+
+This report also produces an email that is sent to key stakeholders with summary
+information if the price change is above 50 cents. 
+
+```{r send_email, warning = FALSE, message = FALSE, echo = TRUE}
+# Calculate the total change
+close <- Cl(last(prices, n = 2))
+diff <- round(as.numeric(close[2]) - as.numeric(close[1]), 2)
+subject <- sprintf("TSLA is %s today by $%g!", 
+        ifelse(diff > 0,"up", "down"), 
+        abs(diff))
+
+# If the change is above a certain threshold, send an email to stake holders
+# with key results embedded directly in the email
+if (abs(diff) > 0.5) {
+  render_connect_email(input = "stock-report-email.Rmd") %>%
+  attach_connect_email(
+    subject = subject,
+    attach_output = TRUE,
+    attachments = c(fname)
+)
+} else {
+  blastula::suppress_scheduled_email()
+}
+```
